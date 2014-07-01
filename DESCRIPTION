@@ -1,0 +1,16 @@
+Package: pepStat
+Type: Package
+Title: Statistical analysis of peptide microarrays
+Version: 0.99.0
+Author: Raphael Gottardo, Gregory C Imholte, Renan Sauteraud, Mike
+        Jiang
+Maintainer: Gregory C Imholte <gimholte@uw.edu>
+Description: Statistical analysis of peptide microarrays
+License: Artistic-2.0
+Depends: R (>= 3.0.0), Biobase, IRanges
+Imports: limma, fields, GenomicRanges, ggplot2, plyr, tools, methods,
+        data.table
+Suggests: pepDat, Pviz, knitr, shiny
+biocViews: Microarray, Preprocessing
+URL: https://github.com/RGLab/pepStat
+VignetteBuilder: knitr
