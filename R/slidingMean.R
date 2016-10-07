@@ -41,60 +41,68 @@
 #' @export
 #' @example examples/pipeline.R
 slidingMean <-function(peptideSet, width=9, verbose=FALSE, split.by.clade=TRUE){
-  .check_peptideSet(peptideSet)
-  if (preproc(peptideSet@experimentData)$transformation!="log" &
-       preproc(peptideSet@experimentData)$transformation!="vsn") {
-    stop("The probe measurements need to be log/vsn transformed!")
-  }
-  if (preproc(peptideSet@experimentData)$normalization=="none"){
-    warning("You should probably normalize your data before using this function")
-  }
-
-  if(split.by.clade & ncol(clade(peptideSet)) > 1){
-    pSet_list <- split(peptideSet, clade(peptideSet))
-    #peptides need to be ordered the same in exprs and featureRange
-    for(i in 1:length(pSet_list)){
-      cur_clade <- colnames(clade(peptideSet))[i]
-      ranges(pSet_list[[i]])$clade <- cur_clade
-      exprs(pSet_list[[i]]) <- .applySlidingMean(
-        exprs(pSet_list[[i]]), width, position(pSet_list[[i]]))
-      pSet_list[[i]] <- .set_rownames(pSet_list[[i]],
-                                      paste(peptide(pSet_list[[i]]), cur_clade, sep="_"))
+    .check_peptideSet(peptideSet)
+    if (preproc(peptideSet@experimentData)$transformation!="log" &
+            preproc(peptideSet@experimentData)$transformation!="vsn") {
+        stop("The probe measurements need to be log/vsn transformed!")
     }
-    #ranges <- do.call("rbind", lapply(pSet_list, ranges))
-    ranges <- unlist(GRangesList(lapply(pSet_list, ranges)))
-    exprs <- do.call("rbind", lapply(pSet_list, exprs))
-    ranges(peptideSet) <- ranges
-    exprs(peptideSet) <- exprs
-    preproc(peptideSet)$split.by.clade <- TRUE
-  } else {
+    if (preproc(peptideSet@experimentData)$normalization=="none"){
+        warning("You should probably normalize your data before using this function")
+    }
+    
+    if(split.by.clade & ncol(clade(peptideSet)) > 1){
+        pSet_list <- split(peptideSet, clade(peptideSet))
+        #peptides need to be ordered the same in exprs and featureRange
+        for(i in 1:length(pSet_list)){
+            cur_clade <- colnames(clade(peptideSet))[i]
+            ranges(pSet_list[[i]])$clade <- cur_clade
+            exprs(pSet_list[[i]]) <- .applySlidingMean(exprs(pSet_list[[i]]), width, 
+                    position(pSet_list[[i]]))
+            # update row names with clade-appended peptide strings
+            clade_rownames <- paste(peptide(pSet_list[[i]]), cur_clade, sep="_")
+            rownames(pSet_list[[i]]) <- clade_rownames
+            names(ranges(pSet_list[[i]])) <- clade_rownames
+        }
+        #ranges <- do.call("rbind", lapply(pSet_list, ranges))
+        clade_ranges <- unlist(GRangesList(lapply(pSet_list, ranges)))
+        clade_exprs <- do.call("rbind", lapply(pSet_list, exprs))    
+        peptideSet_smoothed <- new("peptideSet",
+                exprs = clade_exprs,
+                featureRange = clade_ranges,
+                experimentData = peptideSet@experimentData,
+                phenoData = peptideSet@phenoData,
+                protocolData = peptideSet@protocolData)
+        preproc(peptideSet_smoothed)$split.by.clade <- TRUE
+    } else {
 #     if (length(names(ranges(peptideSet))) > 1)
 #       warning("smoothing multiple spaces together in peptideSet object")
 #     # This could be made more efficient with multicore
-    p <- position(peptideSet)
-    o <- order(p)
-    ro <- order(o)
-
-    y <- exprs(peptideSet)[o,]
-    p <- position(peptideSet)[o]
-    ny <- .applySlidingMean(y, width, p)
-    exprs(peptideSet) <- ny[ro,]
-  }
-
-  if (verbose) {
-    cat("** Finished processing ",nrow(peptideSet)," probes on ",ncol(peptideSet)," arrays **\n");
-  }
-  peptideSet
+        p <- position(peptideSet)
+        o <- order(p)
+        ro <- order(o)
+        
+        y <- exprs(peptideSet)[o,]
+        p <- position(peptideSet)[o]
+        ny <- .applySlidingMean(y, width, p)
+        exprs(peptideSet) <- ny[ro,]
+        peptideSet_smoothed <- peptideSet
+    }
+    
+    if (verbose) {
+        cat("** Finished processing ", nrow(peptideSet_smoothed),
+                " probes on ", ncol(peptideSet_smoothed)," arrays **\n");
+    }
+    peptideSet_smoothed
 }
 
 
 #return A matrix of the intensities ordered like y.
-.applySlidingMean <- function(y, width, position){
-  yn <- sapply(position, function(p) {
-    p.window <- abs(position - p) <= width/2
-    colMeans(y[p.window,,drop = FALSE])
-  })
-  yn <- t(yn)
-  rownames(yn) <- rownames(y)
-  return(yn)
+.applySlidingMean <- function(y, width, position) {
+    yn <- sapply(position, function(p) {
+                p.window <- abs(position - p) <= width/2
+                colMeans(y[p.window,,drop = FALSE])
+            })
+    yn <- t(yn)
+    rownames(yn) <- rownames(y)
+    return(yn)
 }
