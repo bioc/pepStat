@@ -15,3 +15,4 @@ src/pepStat.so
 .rdb
 .rdx
 .*/cache/*
+update_remotes.sh
